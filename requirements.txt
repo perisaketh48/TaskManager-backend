@@ -9,3 +9,5 @@ PyJWT==2.9.0
 rest-framework-simplejwt==0.0.2
 sqlparse==0.5.3
 tzdata==2025.2
+dj-database-url==2.0.0
+python-dotenv==1.0.0  
