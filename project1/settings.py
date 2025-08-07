@@ -18,8 +18,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Security settings
 SECRET_KEY = os.getenv('SECRET_KEY')
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1', 'https://saketh-peri-13.vercel.app').split(',')
-
+ALLOWED_HOSTS = os.getenv(
+    'ALLOWED_HOSTS',
+    'localhost,127.0.0.1,https://saketh-peri-13.vercel.app'
+).split(',')
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -132,7 +134,8 @@ SIMPLE_JWT = {
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3001",
     "http://127.0.0.1:3000",
-    "https://task-manager-blond-nu.vercel.app/"
+    "https://task-manager-blond-nu.vercel.app",
+    "https://saketh-peri-13.vercel.app"
 ]
 
 if os.getenv('PRODUCTION_FRONTEND_URL'):
