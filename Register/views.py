@@ -214,14 +214,6 @@ def todo_folders(request, folder_id=None):
             try:
                 folder = TodoFolder.objects.get(id=folder_id, user=user)
                 
-                # Check if folder is locked and verify password if provided
-                if folder.locked:
-                    current_password = data.get('password')
-                    if not current_password or current_password != folder.password:
-                        return JsonResponse(
-                            {'error': 'Current password is required and must be correct to update a locked folder'},
-                            status=status.HTTP_403_FORBIDDEN
-                        )
                 
                 # Update folder properties
                 name = data.get('name')
