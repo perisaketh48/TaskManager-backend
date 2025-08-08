@@ -203,6 +203,72 @@ def todo_folders(request, folder_id=None):
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    elif request.method == 'PUT':
+        try:
+            data = json.loads(request.body)
+            folder_id = data.get('folder_id')
+            
+            if not folder_id:
+                return JsonResponse({'error': 'Folder ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+            try:
+                folder = TodoFolder.objects.get(id=folder_id, user=user)
+                
+                # Check if folder is locked and verify password if provided
+                if folder.locked:
+                    current_password = data.get('password')
+                    if not current_password or current_password != folder.password:
+                        return JsonResponse(
+                            {'error': 'Current password is required and must be correct to update a locked folder'},
+                            status=status.HTTP_403_FORBIDDEN
+                        )
+                
+                # Update folder properties
+                name = data.get('name')
+                description = data.get('description')
+                locked = data.get('locked')
+                new_password = data.get('password')
+                priority = data.get('priority')
+                
+                if name is not None:
+                    folder.name = name
+                if description is not None:
+                    folder.description = description
+                if priority is not None:
+                    folder.priority = priority
+                
+                # Handle locking/unlocking logic
+                if locked is not None:
+                    if locked and not new_password:
+                        return JsonResponse(
+                            {'error': 'New password is required when locking a folder'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                    folder.locked = locked
+                    if locked:
+                        folder.password = new_password
+                    else:
+                        folder.password = None
+                
+                folder.save()
+                
+                return JsonResponse({
+                    'id': folder.id,
+                    'user_folder_id': folder.user_folder_id,
+                    'name': folder.name,
+                    'description': folder.description,
+                    'locked': folder.locked,
+                    'priority': folder.priority,
+                    'updated_at': folder.updated_at
+                }, status=status.HTTP_200_OK)
+                
+            except TodoFolder.DoesNotExist:
+                return JsonResponse({'error': 'Folder not found'}, status=status.HTTP_404_NOT_FOUND)
+                
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON'}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     return JsonResponse({'error': 'Method not allowed'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
 @csrf_exempt
