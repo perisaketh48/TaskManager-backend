@@ -10,6 +10,7 @@ urlpatterns = [
     
     path('todos/', views.todos, name='todo-list'),  # GET all todos, POST new todo
     path('todos/<int:todo_id>/', views.todo_detail, name='todo-detail'),  # GET, PUT, DELETE specific todo
+    path('folders/<int:folder_id>/verify/', views.verify_folder_password, name='verify_folder_password'), 
     
     path('folders/<int:folder_id>/todos/', views.todos_by_folder, name='todos-by-folder'),
 ]

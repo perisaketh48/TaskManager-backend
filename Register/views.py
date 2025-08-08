@@ -271,6 +271,82 @@ def todo_folders(request, folder_id=None):
             return JsonResponse({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     return JsonResponse({'error': 'Method not allowed'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
+
+@csrf_exempt
+def verify_folder_password(request, folder_id):
+    # Authentication check
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith('Token '):
+        return JsonResponse(
+            {'error': 'Authorization Token required'}, 
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+    
+    token = auth_header.split(' ')[1]
+    
+    try:
+        user = CustomUser.objects.get(auth_token=token)
+    except CustomUser.DoesNotExist:
+        return JsonResponse(
+            {'error': 'Invalid token'}, 
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+
+    if request.method != 'POST':
+        return JsonResponse(
+            {'error': 'Only POST method allowed'}, 
+            status=status.HTTP_405_METHOD_NOT_ALLOWED
+        )
+
+    try:
+        
+        try:
+            folder = TodoFolder.objects.get(id=folder_id, user=user)
+        except TodoFolder.DoesNotExist:
+            return JsonResponse(
+                {'error': 'Folder not found'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Parse request data
+        data = json.loads(request.body)
+        password = data.get('password')
+        
+        if not password:
+            return JsonResponse(
+                {'error': 'Password is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Verify password
+        if folder.locked:
+            if password == folder.password:
+                return JsonResponse(
+                    {'message': 'Password verified successfully'}, 
+                    status=status.HTTP_200_OK
+                )
+            else:
+                return JsonResponse(
+                    {'error': 'Incorrect password'}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        else:
+            return JsonResponse(
+                {'message': 'Folder is not locked, no password required'}, 
+                status=status.HTTP_200_OK
+            )
+
+    except json.JSONDecodeError:
+        return JsonResponse(
+            {'error': 'Invalid JSON'}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    except Exception as e:
+        return JsonResponse(
+            {'error': str(e)}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
 @csrf_exempt
 def todos(request):
     # Authentication check
