@@ -139,9 +139,7 @@ def todo_folders(request, folder_id=None):
             if not name:
                 return JsonResponse({'error': 'Folder name is required'}, status=status.HTTP_400_BAD_REQUEST)
 
-            if locked and not password:
-                return JsonResponse({'error': 'Password is required for locked folders'}, status=status.HTTP_400_BAD_REQUEST)
-
+            
             # Get the next user_folder_id
             last_folder = TodoFolder.objects.filter(user=user).order_by('-user_folder_id').first()
             next_user_folder_id = 1 if not last_folder else last_folder.user_folder_id + 1
@@ -182,14 +180,6 @@ def todo_folders(request, folder_id=None):
             try:
                 folder = TodoFolder.objects.get(id=folder_id, user=user)
                 
-                # Check if folder is locked and password is correct
-                if folder.locked:
-                    password = data.get('password')
-                    if not password or password != folder.password:
-                        return JsonResponse(
-                            {'error': 'Incorrect password for this folder'}, 
-                            status=status.HTTP_403_FORBIDDEN
-                        )
                 
                 folder.delete()
                 return JsonResponse(
@@ -605,22 +595,7 @@ def todos_by_folder(request, folder_id):
         return JsonResponse(data, safe=False, status=status.HTTP_200_OK)
 
     elif request.method == 'POST':
-        # For POST requests (when creating/updating), still require password for locked folders
-        if folder.locked:
-            try:
-                data = json.loads(request.body)
-                password = data.get('password')
-                if not password or password != folder.password:
-                    return JsonResponse(
-                        {'error': 'Incorrect password for this folder'}, 
-                        status=status.HTTP_403_FORBIDDEN
-                    )
-            except json.JSONDecodeError:
-                return JsonResponse(
-                    {'error': 'Password is required in request body for locked folder'}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
+       
         todos = Todo.objects.filter(user=user, folder=folder).order_by('-created_at')
         
         data = {
