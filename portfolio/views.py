@@ -1,8 +1,9 @@
-import os
+import os 
 import json
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from twilio.rest import Client
+import re
 
 @csrf_exempt
 def send_whatsapp_message(request):
@@ -19,6 +20,17 @@ def send_whatsapp_message(request):
 
         if not all([name, email, phone_number, user_message]):
             return JsonResponse({"error": "Missing required fields"}, status=400)
+
+        # Validate & format phone number to E.164 (Twilio requirement)
+        phone_number = str(phone_number).strip()
+        if not phone_number.startswith("+"):
+            # Check if it looks like a valid 10-digit Indian number
+            if re.fullmatch(r"\d{10}", phone_number):
+                phone_number = f"+91{phone_number}"  # prepend Indian country code
+            else:
+                return JsonResponse({
+                    "error": "Invalid phone number format. Please include country code (e.g., +919390795502)."
+                }, status=400)
 
         message_body = (
             f"📩 New Portfolio Contact!\n\n"
@@ -42,14 +54,14 @@ def send_whatsapp_message(request):
         whatsapp_message = client.messages.create(
             from_='whatsapp:+14155238886',  # Twilio sandbox WhatsApp number
             body=message_body,
-            to=f'whatsapp:{phone_number}'  # recipient WhatsApp number with country code
+            to=f'whatsapp:{phone_number}'  # recipient WhatsApp number
         )
 
         # Send SMS message
         sms_message = client.messages.create(
             from_='+12566998810',  # Your Twilio SMS-enabled phone number in E.164
             body=message_body,
-            to=phone_number  # recipient phone number in E.164 format
+            to=phone_number
         )
 
         return JsonResponse({
