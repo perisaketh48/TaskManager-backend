@@ -141,7 +141,7 @@ def send_whatsapp_message(request):
         account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
         auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
         whatsapp_number = os.environ.get("TWILIO_WHATSAPP_NUMBER")
-        my_whatsapp = os.environ.get("MY_WHATSAPP")
+        MY_WHATSAPP = os.environ.get("MY_WHATSAPP")
 
         client = Client(account_sid, auth_token)
 
@@ -149,14 +149,14 @@ def send_whatsapp_message(request):
         whatsapp_message = client.messages.create(
             from_=f"whatsapp:{whatsapp_number}",
             body=message_body,
-            to=f"whatsapp:{my_whatsapp}"
+            to=f"whatsapp:{MY_WHATSAPP}"
         )
 
         # SEND SMS → ONLY TO YOUR NUMBER
         sms_message = client.messages.create(
             from_='+12566998810',
             body=message_body,
-            to=my_whatsapp
+            to=MY_WHATSAPP
         )
 
         # EMAIL YOURSELF

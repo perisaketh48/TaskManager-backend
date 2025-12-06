@@ -11,7 +11,8 @@ from dotenv import load_dotenv
 
 
 # Load environment variables from .env file
-load_dotenv()
+if os.environ.get("RENDER") is None:
+    load_dotenv()
 
 # Build paths
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -174,5 +175,4 @@ EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD")
 
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
-
 
