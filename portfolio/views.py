@@ -192,9 +192,6 @@
 #         return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
 
-
-
-
 import os
 import json
 import csv
@@ -284,7 +281,7 @@ def send_contact_message(request):
 
         name = data.get("name")
         email = data.get("email")
-        phone = data.get("phone_number")
+        phone = data.get("phone_number", "").strip()
         message_text = data.get("message")
 
         # Required fields check
@@ -302,13 +299,29 @@ def send_contact_message(request):
         if "@" not in email:
             return JsonResponse({"error": "Invalid email address"}, status=400)
 
-        if not phone.isdigit() or len(phone) < 10:
-            return JsonResponse({"error": "Invalid phone number"}, status=400)
-
         if len(message_text.strip()) < 5:
             return JsonResponse({"error": "Message too short"}, status=400)
 
-        # Save in database
+        # -----------------------------
+        # PHONE NUMBER NORMALIZATION (+91)
+        # -----------------------------
+        # Case 1: Already like +91XXXXXXXXXX
+        if phone.startswith("+91") and len(phone) == 13 and phone[3:].isdigit():
+            pass
+
+        # Case 2: Starts with 91XXXXXXXXXX => add +
+        elif phone.startswith("91") and len(phone) == 12 and phone[2:].isdigit():
+            phone = "+" + phone
+
+        # Case 3: 10-digit local number => prepend +91
+        elif len(phone) == 10 and phone.isdigit():
+            phone = "+91" + phone
+
+        # Invalid format
+        else:
+            return JsonResponse({"error": "Invalid phone number format"}, status=400)
+
+        # Save message in database
         msg = ContactMessage.objects.create(
             name=name,
             email=email,
