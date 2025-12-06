@@ -105,39 +105,55 @@
 #             "message": str(e)
 #         }, status=500)
 
-
-import os, json, threading
+import os, json
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from django.core.mail import send_mail
+
+# -------- EMAIL (SendGrid API) -------- #
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
 
 
-def send_email_async(subject, body):
+def send_email(subject, body):
     try:
-        send_mail(
+        message = Mail(
+            from_email=os.getenv("EMAIL_FROM"),
+            to_emails=os.getenv("EMAIL_FROM"),
             subject=subject,
-            message=body,
-            from_email=os.getenv("EMAIL_HOST_USER"),
-            recipient_list=[os.getenv("EMAIL_HOST_USER")],
-            fail_silently=False,
+            plain_text_content=body,
         )
+
+        sg = SendGridAPIClient(os.getenv("SENDGRID_API_KEY"))
+        sg.send(message)
+
+        print("✅ Email sent successfully")
     except Exception as e:
-        print("Email error:", e)
+        print("❌ SendGrid Email Error:", e)
 
 
-def send_twilio_async(body):
+# -------- WHATSAPP (Twilio API) -------- #
+from twilio.rest import Client
+
+
+def send_whatsapp(body):
     try:
-        from twilio.rest import Client
-        client = Client(os.getenv("TWILIO_ACCOUNT_SID"), os.getenv("TWILIO_AUTH_TOKEN"))
-        client.messages.create(
+        client = Client(
+            os.getenv("TWILIO_ACCOUNT_SID"),
+            os.getenv("TWILIO_AUTH_TOKEN")
+        )
+
+        msg = client.messages.create(
             from_=f"whatsapp:{os.getenv('TWILIO_WHATSAPP_NUMBER')}",
             to=f"whatsapp:{os.getenv('MY_WHATSAPP')}",
             body=body,
         )
+
+        print("✅ WhatsApp message queued:", msg.sid)
     except Exception as e:
-        print("Twilio error:", e)
+        print("❌ Twilio WhatsApp Error:", e)
 
 
+# -------- MAIN VIEW -------- #
 @csrf_exempt
 def send_whatsapp_message(request):
     if request.method != "POST":
@@ -162,25 +178,15 @@ def send_whatsapp_message(request):
             f"💬 Message: {user_message}"
         )
 
-        # 🔥 Run email async
-        threading.Thread(
-            target=send_email_async,
-            args=("📩 New Portfolio Message", message_body),
-            daemon=True
-        ).start()
+        # 🔥 Execute synchronously — SAFE on Render
+        send_email("📩 New Portfolio Message", message_body)
+        send_whatsapp(message_body)
 
-        # 🔥 Run Twilio async
-        threading.Thread(
-            target=send_twilio_async,
-            args=(message_body,),
-            daemon=True
-        ).start()
-
-        # Return response immediately
         return JsonResponse({
             "status": "success",
-            "message": "Your message has been queued."
+            "message": "Message sent successfully.",
         })
 
     except Exception as e:
+        print("❌ Error in main handler:", e)
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
