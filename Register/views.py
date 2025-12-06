@@ -5,98 +5,79 @@ from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 import json
+from .serializers import CustomUserSerializer
+from rest_framework.views import APIView
 from .models import CustomUser, Todo, TodoFolder
 from rest_framework import status
 import secrets
+from rest_framework.response import Response
 from datetime import datetime
+from rest_framework.permissions import AllowAny
+from rest_framework_simplejwt.tokens import AccessToken
+from django.contrib.auth.hashers import check_password
 
-@csrf_exempt
-def register(request):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'Only POST method allowed'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+class RegisterView(APIView):
+    permission_classes = [AllowAny]
     
-    try:
-        data = json.loads(request.body)
-        email = data.get('email') 
-        password = data.get('password')
-        first_name = data.get('first_name') 
-        last_name = data.get('last_name') 
-        phone = data.get('phone') 
-
-        if not all([email, password, first_name, last_name, phone]):
-            return JsonResponse({'error': 'All fields are required'}, status=status.HTTP_400_BAD_REQUEST)
-
-        if CustomUser.objects.filter(email=email).exists():
-            return JsonResponse({'error': 'Email already exists'}, status=status.HTTP_409_CONFLICT)
-        
+    def post(self, request, *args, **kwargs):
         try:
-            validate_password(password)
-        except ValidationError as e:
-            return JsonResponse({'error': e.messages}, status=status.HTTP_400_BAD_REQUEST)
+            serializer = CustomUserSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
             
-        user = CustomUser.objects.create_user(
-            username=email,
-            email=email,
-            password=password,
-            first_name=first_name,
-            last_name=last_name,
-            phone=phone
-        )
+            user = serializer.save()
+            return Response({
+                'message': 'User registered successfully',
+                'user': serializer.data
+            }, status=status.HTTP_201_CREATED)
+            
+        except ValidationError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        return JsonResponse({
-            'message': 'User registered successfully',
-            'user': {
-                'id': user.id,
-                'email': user.email,
-                'first_name': user.first_name,
-                'last_name': user.last_name,
-                'phone': user.phone
-            }
-        }, status=status.HTTP_201_CREATED)
-        
-    except json.JSONDecodeError:
-        return JsonResponse({'error': 'Invalid JSON'}, status=status.HTTP_400_BAD_REQUEST)
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-@csrf_exempt
-def Login(request):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'Only POST method allowed'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
-   
-    try:
-        data = json.loads(request.body)
-        email = data.get('email')
-        password = data.get('password')
+class LoginView(APIView):
+    permission_classes = [AllowAny]
+    
+    def post(self, request, *args, **kwargs):
+        email = request.data.get('email', '').lower().strip()
+        password = request.data.get('password')
         
         if not email or not password:
-            return JsonResponse({'error': 'Email and password are required'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'error': 'Both email and password are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         try:
             user = CustomUser.objects.get(email=email)
-            if user.check_password(password):
-                token = secrets.token_urlsafe(12)
-                user.auth_token = token
-                user.save()
-                
-                return JsonResponse({
-                    'message': 'Login successful',
-                    'token': token,
-                    'user_id': user.id,
+            
+            if not check_password(password, user.password):
+                return Response(
+                    {'error': 'Invalid credentials'},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            # Generate token and extract first 12 chars of the signature
+            full_token = str(AccessToken.for_user(user))
+            short_token = full_token.split('.')[-1][:12]  # Last part (signature) first 12 chars
+            
+            return Response({
+                'message': 'Login successful',
+                'token': short_token, 
+                'full_token': full_token,  
+                'user': {
+                    'id': user.id,
                     'email': user.email,
                     'first_name': user.first_name,
-                    'last_name': user.last_name
-                })
-            else:
-                return JsonResponse({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
-        except CustomUser.DoesNotExist:
-            return JsonResponse({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+                    'last_name': user.last_name,
+                    'phone': user.phone,
+                    'is_active': user.is_active
+                }
+            }, status=status.HTTP_200_OK)
             
-    except json.JSONDecodeError:
-        return JsonResponse({'error': 'Invalid JSON'}, status=status.HTTP_400_BAD_REQUEST)
-    except Exception as e:
-        return JsonResponse({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+        except CustomUser.DoesNotExist:
+            return Response(
+                {'error': 'Invalid credentials'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
 @csrf_exempt
 def todo_folders(request, folder_id=None):
     auth_header = request.headers.get('Authorization')
@@ -134,7 +115,7 @@ def todo_folders(request, folder_id=None):
             description = data.get('description', '')
             locked = data.get('locked', False)
             password = data.get('password', '') if locked else None
-            priority = data.get('priority', 'medium')
+            priority = data.get('priority')
 
             if not name:
                 return JsonResponse({'error': 'Folder name is required'}, status=status.HTTP_400_BAD_REQUEST)

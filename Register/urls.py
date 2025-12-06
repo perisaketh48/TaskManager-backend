@@ -1,9 +1,10 @@
 from django.urls import path
 from . import views
+from .views import RegisterView,LoginView
 
 urlpatterns = [
-    path('register/', views.register, name='register'),
-    path('login/', views.Login, name='login'),
+    path('register/', RegisterView.as_view(), name='register'),
+    path('login/', LoginView.as_view(), name='login'),
     
     path('folders/', views.todo_folders, name='todo-folders'),  # GET all folders, POST new folder
     path('folders/<int:folder_id>/', views.todo_folders, name='folder-detail'),  # DELETE folder

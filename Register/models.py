@@ -4,12 +4,17 @@ from django.contrib.auth.base_user import BaseUserManager
 
 
 
+from django.db import models
+from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.base_user import BaseUserManager
+from django.core.validators import RegexValidator
+
 class CustomManager(BaseUserManager):
     def create_user(self,email,password=None,**extra_fields):
         if not email:
             raise ValueError('The Email must be set')
         email= self.normalize_email(email)
-        user=self.model(email=email, **extra_fields)
+        user=self.model(email=email,**extra_fields)
         user.set_password(password)
         user.save()
         return user
@@ -24,21 +29,43 @@ class CustomManager(BaseUserManager):
             raise ValueError('Superuser must have is_superuser=True')
 
         return self.create_user(email, password, **extra_fields)
-    
+        
 class CustomUser(AbstractUser):
-
-    auth_token = models.CharField(max_length=32, blank=True, null=True)
+    phone_validator = RegexValidator(
+        regex=r'^\+?1?\d{9,15}$',
+        message="Phone number must be in format: '+999999999'."
+    )
     email=models.EmailField(unique=True)
-    username= models.CharField(max_length=200)
-    first_name= models.CharField(max_length=200)
-    last_name= models.CharField(max_length=200)
-    phone= models.CharField(max_length=12)
-    is_active= models.BooleanField(default=False)
+    username=models.CharField(max_length=200)
+    first_name=models.CharField(max_length=200)
+    last_name=models.CharField(max_length=200)
+    phone = models.CharField(
+        max_length=17,
+        validators=[phone_validator],
+        unique=True  
+    )
+    is_active=models.BooleanField(default=False)
     is_staff=models.BooleanField(default=False)
-
     USERNAME_FIELD='email'
     REQUIRED_FIELDS=['phone']
     objects = CustomManager()
+    
+    groups = models.ManyToManyField(
+        'auth.Group',
+        verbose_name='groups',
+        blank=True,
+        help_text='The groups this user belongs to.',
+        related_name="statuspost_user_groups",  # Add this
+        related_query_name="statuspost_user",
+    )
+    user_permissions = models.ManyToManyField(
+        'auth.Permission',
+        verbose_name='user permissions',
+        blank=True,
+        help_text='Specific permissions for this user.',
+        related_name="statuspost_user_permissions",  # Add this
+        related_query_name="statuspost_user",
+    )
 
 class TodoFolder(models.Model):
     PRIORITY_CHOICES = [
