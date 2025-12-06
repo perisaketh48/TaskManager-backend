@@ -106,13 +106,36 @@
 #         }, status=500)
 
 
-
-import os
-import json
-import re
+import os, json, threading
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.core.mail import send_mail
+
+
+def send_email_async(subject, body):
+    try:
+        send_mail(
+            subject=subject,
+            message=body,
+            from_email=os.getenv("EMAIL_HOST_USER"),
+            recipient_list=[os.getenv("EMAIL_HOST_USER")],
+            fail_silently=False,
+        )
+    except Exception as e:
+        print("Email error:", e)
+
+
+def send_twilio_async(body):
+    try:
+        from twilio.rest import Client
+        client = Client(os.getenv("TWILIO_ACCOUNT_SID"), os.getenv("TWILIO_AUTH_TOKEN"))
+        client.messages.create(
+            from_=f"whatsapp:{os.getenv('TWILIO_WHATSAPP_NUMBER')}",
+            to=f"whatsapp:{os.getenv('MY_WHATSAPP')}",
+            body=body,
+        )
+    except Exception as e:
+        print("Twilio error:", e)
 
 
 @csrf_exempt
@@ -139,55 +162,25 @@ def send_whatsapp_message(request):
             f"💬 Message: {user_message}"
         )
 
-        # -------------------------------
-        # EMAIL ALWAYS RUNS FIRST
-        # -------------------------------
-        email_status = "sent"
-        try:
-            send_mail(
-                subject="📩 New Portfolio Message",
-                message=message_body,
-                from_email=os.getenv("EMAIL_HOST_USER"),
-                recipient_list=[os.getenv("EMAIL_HOST_USER")],
-                fail_silently=False,
-            )
-        except Exception as e:
-            email_status = f"failed: {str(e)}"
+        # 🔥 Run email async
+        threading.Thread(
+            target=send_email_async,
+            args=("📩 New Portfolio Message", message_body),
+            daemon=True
+        ).start()
 
-        # -------------------------------
-        # TWILIO — SAFE IMPORT + SAFE EXECUTION
-        # -------------------------------
-        twilio_status = "skipped"
-        try:
-            # LAZY IMPORT — FIXES RENDER CRASH
-            from twilio.rest import Client
+        # 🔥 Run Twilio async
+        threading.Thread(
+            target=send_twilio_async,
+            args=(message_body,),
+            daemon=True
+        ).start()
 
-            client = Client(
-                os.getenv("TWILIO_ACCOUNT_SID"),
-                os.getenv("TWILIO_AUTH_TOKEN")
-            )
-
-            whatsapp = os.getenv("TWILIO_WHATSAPP_NUMBER")
-            my_whatsapp = os.getenv("MY_WHATSAPP")
-
-            twilio_message = client.messages.create(
-                from_=f"whatsapp:{whatsapp}",
-                to=f"whatsapp:{my_whatsapp}",
-                body=message_body,
-            )
-            twilio_status = "sent"
-
-        except Exception as twilio_error:
-            twilio_status = f"failed: {str(twilio_error)}"
-
+        # Return response immediately
         return JsonResponse({
             "status": "success",
-            "email": email_status,
-            "twilio": twilio_status
+            "message": "Your message has been queued."
         })
 
     except Exception as e:
-        return JsonResponse({
-            "status": "error",
-            "message": str(e)
-        }, status=500)
+        return JsonResponse({"status": "error", "message": str(e)}, status=500)
