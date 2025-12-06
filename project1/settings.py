@@ -139,22 +139,29 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
 }
 
-CORS_ALLOW_ALL_ORIGINS = True
 
-
-# CORS settings
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3001",
     "http://localhost:8080",
     "http://127.0.0.1:3000",
     "https://task-manager-blond-nu.vercel.app",
-    "https://saketh-peri-13.vercel.app"
+    "https://saketh-peri-13.vercel.app",
+    "https://taskmanager-backend-5vyz.onrender.com",
 ]
+
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = ["*"]
+CORS_ALLOW_METHODS = ["*"]
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://saketh-peri-13.vercel.app",
+    "https://taskmanager-backend-5vyz.onrender.com",
+]
+
 
 if os.getenv('PRODUCTION_FRONTEND_URL'):
     CORS_ALLOWED_ORIGINS.append(os.getenv('PRODUCTION_FRONTEND_URL').rstrip('/'))
 
-CORS_ALLOW_CREDENTIALS = True
 
 # Security headers (for production)
 if not DEBUG:
