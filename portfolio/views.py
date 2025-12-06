@@ -106,15 +106,16 @@
 #         }, status=500)
 import os
 import json
+import re
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from twilio.rest import Client
 from django.core.mail import send_mail
-import re
+
 
 @csrf_exempt
 def send_whatsapp_message(request):
-    if request.method != 'POST':
+    if request.method != "POST":
         return JsonResponse({"error": "Invalid request method"}, status=400)
 
     try:
@@ -128,7 +129,6 @@ def send_whatsapp_message(request):
         if not all([name, email, phone_number, user_message]):
             return JsonResponse({"error": "Missing required fields"}, status=400)
 
-        # Format message
         message_body = (
             f"📩 New Portfolio Contact!\n\n"
             f"👤 Name: {name}\n"
@@ -137,56 +137,44 @@ def send_whatsapp_message(request):
             f"💬 Message: {user_message}"
         )
 
-        # ----------------------------------------------------
-        # 1️⃣ SEND EMAIL FIRST (does not depend on Twilio)
-        # ----------------------------------------------------
-        send_mail(
-            subject="📩 New Message From Portfolio",
-            message=message_body,
-            from_email=os.environ.get("EMAIL_HOST_USER"),
-            recipient_list=[os.environ.get("EMAIL_HOST_USER")],
-            fail_silently=False,
-        )
-
-        whatsapp_sid = None
-        sms_sid = None
-
-        # ----------------------------------------------------
-        # 2️⃣ TRY SENDING TWILIO, BUT DO NOT FAIL IF ERROR
-        # ----------------------------------------------------
+        # EMAIL ALWAYS RUNS — EVEN IF TWILIO FAILS
+        email_status = "sent"
         try:
-            account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
-            auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
-            whatsapp_number = os.environ.get("TWILIO_WHATSAPP_NUMBER")
-            MY_WHATSAPP = os.environ.get("MY_WHATSAPP")
-
-            client = Client(account_sid, auth_token)
-
-            # WhatsApp
-            whatsapp = client.messages.create(
-                from_=f"whatsapp:{whatsapp_number}",
-                body=message_body,
-                to=f"whatsapp:{MY_WHATSAPP}"
+            send_mail(
+                subject="📩 New Portfolio Message",
+                message=message_body,
+                from_email=os.getenv("EMAIL_HOST_USER"),
+                recipient_list=[os.getenv("EMAIL_HOST_USER")],
+                fail_silently=False,
             )
-            whatsapp_sid = whatsapp.sid
+        except Exception as e:
+            email_status = f"failed: {str(e)}"
 
-            # SMS
-            sms = client.messages.create(
-                from_='+12566998810',
-                body=message_body,
-                to=MY_WHATSAPP
+        # TWILIO MAY FAIL — BUT WILL NOT BREAK API
+        twilio_status = "skipped"
+        try:
+            client = Client(
+                os.getenv("TWILIO_ACCOUNT_SID"),
+                os.getenv("TWILIO_AUTH_TOKEN")
             )
-            sms_sid = sms.sid
+
+            whatsapp = os.getenv("TWILIO_WHATSAPP_NUMBER")
+            my_whatsapp = os.getenv("MY_WHATSAPP")
+
+            twilio_message = client.messages.create(
+                from_=f"whatsapp:{whatsapp}",
+                to=f"whatsapp:{my_whatsapp}",
+                body=message_body,
+            )
+            twilio_status = "sent"
 
         except Exception as twilio_error:
-            # DO NOT FAIL — Twilio can fail but email is still sent
-            print("Twilio Error:", twilio_error)
+            twilio_status = f"failed: {str(twilio_error)}"
 
         return JsonResponse({
             "status": "success",
-            "email_status": "sent",
-            "whatsapp_sid": whatsapp_sid,
-            "sms_sid": sms_sid
+            "email": email_status,
+            "twilio": twilio_status
         })
 
     except Exception as e:
