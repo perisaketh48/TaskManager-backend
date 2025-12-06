@@ -64,7 +64,7 @@ sortedcontainers==2.4.0
 soupsieve==2.7
 SpeechRecognition==3.8.1
 sqlparse==0.5.3
-textract==1.6.5
+textract==1.6.3
 typing_extensions==4.12.2
 tzdata==2025.2
 tzlocal==5.3.1
