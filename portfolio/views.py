@@ -104,12 +104,14 @@
 #             "status": "error",
 #             "message": str(e)
 #         }, status=500)
+
+
+
 import os
 import json
 import re
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from twilio.rest import Client
 from django.core.mail import send_mail
 
 
@@ -137,7 +139,9 @@ def send_whatsapp_message(request):
             f"💬 Message: {user_message}"
         )
 
-        # EMAIL ALWAYS RUNS — EVEN IF TWILIO FAILS
+        # -------------------------------
+        # EMAIL ALWAYS RUNS FIRST
+        # -------------------------------
         email_status = "sent"
         try:
             send_mail(
@@ -150,9 +154,14 @@ def send_whatsapp_message(request):
         except Exception as e:
             email_status = f"failed: {str(e)}"
 
-        # TWILIO MAY FAIL — BUT WILL NOT BREAK API
+        # -------------------------------
+        # TWILIO — SAFE IMPORT + SAFE EXECUTION
+        # -------------------------------
         twilio_status = "skipped"
         try:
+            # LAZY IMPORT — FIXES RENDER CRASH
+            from twilio.rest import Client
+
             client = Client(
                 os.getenv("TWILIO_ACCOUNT_SID"),
                 os.getenv("TWILIO_AUTH_TOKEN")
